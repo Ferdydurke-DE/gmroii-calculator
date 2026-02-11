@@ -386,7 +386,7 @@ h1 {
   line-height: 1.5;
 }
 
-/* Responsive */
+/* Responsive - tablet */
 @media (max-width: 900px) {
   .dashboard {
     grid-template-columns: 1fr;
@@ -401,9 +401,86 @@ h1 {
   .advisor-grid { grid-template-columns: 1fr; }
 }
 
+/* Responsive - mobile */
 @media (max-width: 600px) {
-  body { padding: 12px; }
-  .input-panel { grid-template-columns: 1fr 1fr; }
+  body { padding: 10px; }
+  h1 { font-size: 1.2rem; }
+  .subtitle { font-size: 0.78rem; }
+
+  .input-panel {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .input-panel .field[style*="span 2"] {
+    grid-column: span 1 !important;
+  }
+
+  .field input[type="number"],
+  .field input[type="text"],
+  .field select {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    padding: 10px;
+  }
+
+  .slider-group {
+    flex-wrap: wrap;
+  }
+  .slider-group input[type="range"] {
+    width: 100%;
+    flex: none;
+  }
+
+  .metrics-panel {
+    flex-direction: column;
+  }
+  .metric-card {
+    min-width: 0;
+    flex: none;
+    width: 100%;
+  }
+  .metric-card .metric-value {
+    font-size: 1.4rem;
+  }
+  .metric-card .metric-formula {
+    font-size: 0.63rem;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .comparison-table {
+    font-size: 0.75rem;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .comparison-table th,
+  .comparison-table td {
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+  .comparison-table .formula {
+    display: none;
+  }
+
+  .chart-container {
+    height: 180px;
+    padding: 16px 0 26px 36px;
+  }
+  .chart-y-axis { width: 32px; }
+  .bar-value { font-size: 0.5rem; }
+  .bar-label { font-size: 0.5rem; }
+
+  .advisor-grid {
+    grid-template-columns: 1fr;
+  }
+  .advisor-inputs {
+    grid-template-columns: 1fr;
+  }
+  .advisor-verdict { font-size: 1.1rem; }
+  .advisor-explanation { font-size: 0.78rem; }
+
+  .card { padding: 14px; }
+  .card h2 { font-size: 0.72rem; }
 }
 
 .info-tip {
