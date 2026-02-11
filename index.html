@@ -491,8 +491,8 @@ h1 {
 
 <!-- DISCOUNT STEP ADVISOR -->
 <div class="card advisor-section">
-  <h2>Discount Step Advisor <span class="info-tip" title="Should you order more copies to reach the next discount tier? Uses the 4% rule from Shatzkin.">?</span></h2>
-  <p style="font-size:0.82rem; color:var(--muted); margin-bottom:16px;">You planned to order a certain number of copies at your current discount. The vendor offers a higher discount if you order more. Is the extra discount worth the extra copies?</p>
+  <h2>Discount Step Advisor <span class="info-tip" title="Should you order more copies to reach the next discount tier? Uses the exact GMROII break-even formula based on your actual margin.">?</span></h2>
+  <p style="font-size:0.82rem; color:var(--muted); margin-bottom:16px;">You planned to order a certain number of copies at your current discount. The vendor offers a higher discount if you order more. Is the extra discount worth the extra copies? Calculated using the exact markup ratio, not Shatzkin's fixed 4% approximation.</p>
   <div class="advisor-grid">
     <div class="advisor-inputs">
       <div class="field">
@@ -770,45 +770,51 @@ h1 {
     const verdictDiv = $('advisorVerdict');
     const explDiv = $('advisorExplanation');
 
-    if (dNext <= dCurr || qNext <= qCurr || dCurr <= 0) {
+    if (dNext <= dCurr || qNext <= qCurr || dCurr <= 0 || dCurr >= 1) {
       resultDiv.className = 'advisor-result neutral';
       verdictDiv.textContent = 'Check inputs';
       explDiv.textContent = 'Next tier discount must be higher than current, and next tier quantity must be larger.';
       return;
     }
 
-    // The 4% rule: each 1% increase in discount is worth ~4% more copies.
-    // More precisely: is the extra margin from the higher discount on ALL copies
-    // greater than the carrying cost of the extra copies?
-    const discountGainPct = ((dNext - dCurr) * 100); // percentage points gained
+    // Exact GMROII break-even formula:
+    // GMROII = markup × inventory_turnover = [D/(1-D)] × turn
+    // Turnover is inversely proportional to qty (same sales rate, more stock).
+    // To maintain GMROII: (D2/(1-D2)) × (Q1/Q2) >= (D1/(1-D1))
+    // => max Q2/Q1 = (D2/(1-D2)) / (D1/(1-D1)) = markup_new / markup_old
+    const markupCurr = dCurr / (1 - dCurr);
+    const markupNext = dNext / (1 - dNext);
+    const allowableIncreaseRatio = markupNext / markupCurr;
+    const allowableIncreasePct = (allowableIncreaseRatio - 1) * 100;
+
+    const discountGainPct = (dNext - dCurr) * 100;
     const qtyIncreasePct = ((qNext - qCurr) / qCurr) * 100;
+    const marginGainPct = ((markupNext - markupCurr) / markupCurr) * 100;
 
-    // Shatzkin's rule of thumb: each 1% discount point is worth ordering ~4% more copies.
-    // So allowable qty increase = discountGainPct * 4 (as %)
-    const allowableIncreasePct = discountGainPct * 4;
-
-    // Total margin at current: qCurr * price * dCurr
-    // Total margin at next:    qNext * price * dNext
-    // We care about margin per dollar invested ratio change
-    const marginPerDollarCurr = dCurr / (1 - dCurr);
-    const marginPerDollarNext = dNext / (1 - dNext);
-    const marginGainPct = ((marginPerDollarNext - marginPerDollarCurr) / marginPerDollarCurr) * 100;
+    // Shatzkin's fixed 4% rule comparison
+    const shatzkinAllowable = discountGainPct * 4;
+    const shatzkinDiff = allowableIncreasePct - shatzkinAllowable;
+    const shatzkinNote = Math.abs(shatzkinDiff) > 0.1
+      ? ` Shatzkin's fixed 4% rule would say <strong>~${shatzkinAllowable.toFixed(1)}%</strong> &mdash; ${shatzkinDiff > 0 ? 'too conservative' : 'too generous'} at your margin level.`
+      : '';
 
     const worthIt = qtyIncreasePct <= allowableIncreasePct;
 
     if (worthIt) {
       resultDiv.className = 'advisor-result worth-it';
       verdictDiv.textContent = 'Worth it';
-      explDiv.innerHTML = `The <strong>+${discountGainPct.toFixed(1)}%</strong> discount gain allows up to <strong>~${allowableIncreasePct.toFixed(0)}%</strong> more copies (4% rule). ` +
-        `You need <strong>+${qtyIncreasePct.toFixed(1)}%</strong> more copies &mdash; within the allowable range. ` +
-        `Margin per dollar improves from <strong>${marginPerDollarCurr.toFixed(3)}</strong> to <strong>${marginPerDollarNext.toFixed(3)}</strong> (+${marginGainPct.toFixed(1)}%).`;
+      explDiv.innerHTML = `At <strong>${(dCurr*100).toFixed(1)}%</strong> margin, the <strong>+${discountGainPct.toFixed(1)} pp</strong> discount gain allows up to <strong>+${allowableIncreasePct.toFixed(1)}%</strong> more copies (exact markup ratio). ` +
+        `You need <strong>+${qtyIncreasePct.toFixed(1)}%</strong> more &mdash; within the allowable range. ` +
+        `Markup improves from <strong>${markupCurr.toFixed(3)}</strong> to <strong>${markupNext.toFixed(3)}</strong> (+${marginGainPct.toFixed(1)}%).` +
+        shatzkinNote;
     } else {
       resultDiv.className = 'advisor-result not-worth-it';
       verdictDiv.textContent = 'Not worth it';
-      explDiv.innerHTML = `The <strong>+${discountGainPct.toFixed(1)}%</strong> discount gain allows up to <strong>~${allowableIncreasePct.toFixed(0)}%</strong> more copies (4% rule). ` +
-        `But you need <strong>+${qtyIncreasePct.toFixed(1)}%</strong> more copies &mdash; exceeds the allowable range. ` +
-        `The extra inventory carrying cost outweighs the margin improvement. ` +
-        `Margin per dollar only goes from <strong>${marginPerDollarCurr.toFixed(3)}</strong> to <strong>${marginPerDollarNext.toFixed(3)}</strong> (+${marginGainPct.toFixed(1)}%).`;
+      explDiv.innerHTML = `At <strong>${(dCurr*100).toFixed(1)}%</strong> margin, the <strong>+${discountGainPct.toFixed(1)} pp</strong> discount gain allows up to <strong>+${allowableIncreasePct.toFixed(1)}%</strong> more copies (exact markup ratio). ` +
+        `But you need <strong>+${qtyIncreasePct.toFixed(1)}%</strong> more &mdash; exceeds the break-even threshold. ` +
+        `The extra inventory cost outweighs the margin improvement. ` +
+        `Markup goes from <strong>${markupCurr.toFixed(3)}</strong> to <strong>${markupNext.toFixed(3)}</strong> (+${marginGainPct.toFixed(1)}%).` +
+        shatzkinNote;
     }
   }
 
