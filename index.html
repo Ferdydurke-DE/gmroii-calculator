@@ -174,6 +174,25 @@ h1 {
   margin-top: 2px;
 }
 
+.metric-card .metric-formula {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 4px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  background: #f0f2f5;
+  padding: 3px 6px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.comparison-table .formula {
+  display: block;
+  font-size: 0.65rem;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
 .metric-card.highlight {
   border-color: var(--accent);
   background: linear-gradient(135deg, var(--accent-light) 0%, #fff 100%);
@@ -413,10 +432,6 @@ h1 {
 <div class="card" style="margin-bottom: 24px;">
   <h2>Title Details</h2>
   <div class="input-panel">
-    <div class="field" style="grid-column: span 2;">
-      <label for="titleName">Title Name</label>
-      <input type="text" id="titleName" value="Sample Book" placeholder="Enter title...">
-    </div>
     <div class="field">
       <label for="retailPrice">Retail Price ($)</label>
       <input type="number" id="retailPrice" value="20" min="0.01" step="0.01">
@@ -523,7 +538,6 @@ h1 {
 (function() {
   // --- DOM refs ---
   const $ = id => document.getElementById(id);
-  const titleName     = $('titleName');
   const retailPrice   = $('retailPrice');
   const discountSlider = $('discountSlider');
   const discountInput  = $('discountInput');
@@ -546,7 +560,7 @@ h1 {
   orderInput.addEventListener('input', () => { orderSlider.value = orderInput.value; recalc(); });
 
   // --- Recalculate on any change ---
-  const inputs = [titleName, retailPrice, discountSlider, discountInput, currentStock, weeklySales,
+  const inputs = [retailPrice, discountSlider, discountInput, currentStock, weeklySales,
                   orderSlider, orderInput, reorderFreq];
   inputs.forEach(el => el.addEventListener('input', recalc));
   reorderFreq.addEventListener('change', recalc);
@@ -631,49 +645,61 @@ h1 {
   }
 
   // --- Render metrics panel ---
-  function renderMetrics(m) {
+  function renderMetrics(m, inp) {
     const panel = $('metricsPanel');
     const gmroiiClass = m.gmroii >= 2 ? 'positive' : m.gmroii >= 1 ? '' : 'negative';
+    const p = inp.price;
+    const d = inp.discount;
+    const annualCOGS = (inp.salesPerWeek * 52 * m.costPerCopy);
+    const rev30 = inp.salesPerWeek * (30/7) * p;
     panel.innerHTML = `
       <div class="metric-card highlight">
         <div class="metric-label">GMROII</div>
         <div class="metric-value">${m.gmroii.toFixed(2)}</div>
         <div class="metric-sub">$ earned per $ invested/yr</div>
+        <div class="metric-formula">${m.marginPerDollar.toFixed(3)} &times; ${m.stockTurn.toFixed(1)} = ${m.gmroii.toFixed(2)}<br>markup &times; stock turn</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">GMROS (Discount)</div>
         <div class="metric-value">${(m.gmros * 100).toFixed(1)}%</div>
         <div class="metric-sub">Margin on sales</div>
+        <div class="metric-formula">$${m.marginPerCopy.toFixed(2)} / $${p.toFixed(2)} = ${(m.gmros * 100).toFixed(1)}%<br>margin per copy / retail price</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Stock Turn</div>
         <div class="metric-value">${m.stockTurn.toFixed(1)}</div>
         <div class="metric-sub">Annual inventory turns</div>
+        <div class="metric-formula">$${annualCOGS.toFixed(0)} / $${m.avgInvAtCost.toFixed(0)} = ${m.stockTurn.toFixed(1)}<br>annual COGS / avg inventory at cost</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Cost / Copy</div>
         <div class="metric-value">$${m.costPerCopy.toFixed(2)}</div>
         <div class="metric-sub">Margin: $${m.marginPerCopy.toFixed(2)}</div>
+        <div class="metric-formula">$${p.toFixed(2)} &times; (1 &minus; ${(d*100).toFixed(1)}%) = $${m.costPerCopy.toFixed(2)}<br>$${p.toFixed(2)} &times; ${(d*100).toFixed(1)}% = $${m.marginPerCopy.toFixed(2)} margin</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Margin per $ Invested</div>
+        <div class="metric-label">Markup (margin per $ invested)</div>
         <div class="metric-value">${m.marginPerDollar.toFixed(3)}</div>
-        <div class="metric-sub">discount / (1 - discount)</div>
+        <div class="metric-sub">discount / (1 &minus; discount)</div>
+        <div class="metric-formula">${(d*100).toFixed(1)}% / ${((1-d)*100).toFixed(1)}% = ${m.marginPerDollar.toFixed(3)}<br>or: $${m.marginPerCopy.toFixed(2)} / $${m.costPerCopy.toFixed(2)}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Avg Inventory (cost)</div>
         <div class="metric-value">$${m.avgInvAtCost.toFixed(0)}</div>
         <div class="metric-sub">${m.avgUnits.toFixed(1)} units on avg</div>
+        <div class="metric-formula">(${inp.stock} + ${inp.orderQty}/2) &times; $${m.costPerCopy.toFixed(2)} = $${m.avgInvAtCost.toFixed(0)}<br>(stock + order/2) &times; cost per copy</div>
       </div>
       <div class="metric-card ${gmroiiClass}">
         <div class="metric-label">Annual Gross Margin</div>
         <div class="metric-value">$${m.annualGrossMargin.toFixed(0)}</div>
         <div class="metric-sub">GMROII &times; avg inv at cost</div>
+        <div class="metric-formula">${m.gmroii.toFixed(2)} &times; $${m.avgInvAtCost.toFixed(0)} = $${m.annualGrossMargin.toFixed(0)}<br>or: ${inp.salesPerWeek} &times; 52 &times; $${m.marginPerCopy.toFixed(2)} = $${m.annualGrossMargin.toFixed(0)}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Cash Flow</div>
         <div class="metric-value cashflow-${m.cashflow}" style="font-size:1rem;">${m.cashflowText}</div>
         <div class="metric-sub">Order cost: $${m.orderCost.toFixed(0)}</div>
+        <div class="metric-formula">${inp.salesPerWeek} &times; ${(30/7).toFixed(1)}wk &times; $${p.toFixed(2)} = $${rev30.toFixed(0)} rev/30d<br>vs order: ${inp.orderQty} &times; $${m.costPerCopy.toFixed(2)} = $${m.orderCost.toFixed(0)}</div>
       </div>
     `;
   }
@@ -706,12 +732,13 @@ h1 {
       const tags = (isCurrent ? '<span class="tag tag-current">current</span>' : '') +
                    (isOptimal ? '<span class="tag tag-optimal">best</span>' : '') +
                    (q === bestQty && isCurrent ? '<span class="tag tag-optimal">best</span>' : '');
+      const annCOGS = inp.salesPerWeek * 52 * m.costPerCopy;
       return `<tr class="${cls}">
         <td>${q}${tags}</td>
-        <td>${m.avgUnits.toFixed(1)} units</td>
-        <td>${m.stockTurn.toFixed(1)}</td>
-        <td>${m.gmroii.toFixed(2)}</td>
-        <td>$${m.annualGrossMargin.toFixed(0)}</td>
+        <td>${m.avgUnits.toFixed(1)} units<span class="formula">${inp.stock}+${q}/2 = ${m.avgUnits.toFixed(1)}</span></td>
+        <td>${m.stockTurn.toFixed(1)}<span class="formula">${annCOGS.toFixed(0)}/${m.avgInvAtCost.toFixed(0)}</span></td>
+        <td>${m.gmroii.toFixed(2)}<span class="formula">${m.marginPerDollar.toFixed(3)}&times;${m.stockTurn.toFixed(1)}</span></td>
+        <td>$${m.annualGrossMargin.toFixed(0)}<span class="formula">${m.gmroii.toFixed(2)}&times;${m.avgInvAtCost.toFixed(0)}</span></td>
       </tr>`;
     }).join('');
   }
@@ -822,7 +849,7 @@ h1 {
   function recalc() {
     const inp = getInputs();
     const m = calcMetrics(inp);
-    renderMetrics(m);
+    renderMetrics(m, inp);
     renderComparison(inp);
     renderEarningChart(inp);
   }
