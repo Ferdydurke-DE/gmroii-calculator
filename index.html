@@ -257,6 +257,15 @@ h1 {
 .tag-optimal { background: var(--green-light); color: var(--green); }
 .tag-current { background: var(--accent-light); color: var(--accent); }
 
+.coverage-full { color: var(--green); font-weight: 600; }
+.coverage-short { color: var(--red); font-weight: 600; }
+
+.comparison-table tr.suboptimal {
+  background: var(--red-light);
+  opacity: 0.7;
+}
+.tag-suboptimal { background: var(--orange-light); color: var(--orange); }
+
 /* Chart Section */
 .chart-section {
   grid-column: 2;
@@ -264,66 +273,13 @@ h1 {
 
 .chart-container {
   position: relative;
-  height: 220px;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  padding: 20px 0 30px 50px;
+  width: 100%;
 }
 
-.chart-y-axis {
-  position: absolute;
-  left: 0;
-  top: 20px;
-  bottom: 30px;
-  width: 46px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-right: 6px;
-}
-
-.chart-y-axis span {
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-
-.bar-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.bar {
-  width: 80%;
-  max-width: 40px;
-  border-radius: 3px 3px 0 0;
-  transition: height 0.3s ease;
-  min-height: 2px;
-  position: relative;
-}
-
-.bar-label {
-  font-size: 0.6rem;
-  color: var(--muted);
-  margin-top: 4px;
-  white-space: nowrap;
-  text-align: center;
-}
-
-.bar-value {
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.6rem;
-  font-weight: 600;
-  white-space: nowrap;
+.chart-container svg {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .chart-title {
@@ -462,13 +418,9 @@ h1 {
     display: none;
   }
 
-  .chart-container {
-    height: 180px;
-    padding: 16px 0 26px 36px;
+  .chart-container svg {
+    height: auto;
   }
-  .chart-y-axis { width: 32px; }
-  .bar-value { font-size: 0.5rem; }
-  .bar-label { font-size: 0.5rem; }
 
   .advisor-grid {
     grid-template-columns: 1fr;
@@ -538,14 +490,19 @@ h1 {
       </div>
     </div>
     <div class="field">
-      <label for="reorderFreq">Reorder Frequency</label>
-      <select id="reorderFreq">
-        <option value="1">Daily</option>
-        <option value="3">Every 3 Days</option>
-        <option value="7" selected>Weekly</option>
-        <option value="14">Biweekly</option>
-        <option value="30">Monthly</option>
-      </select>
+      <label for="paymentDays">Payment Terms<span class="info-tip" title="Number of days to pay the vendor invoice. Cash flow check compares sales revenue within this window vs order cost.">?</span></label>
+      <input type="number" id="paymentDays" value="30" min="1" max="365" step="1">
+    </div>
+    <div class="field" style="grid-column: span 2;">
+      <label>Reorder Every</label>
+      <div class="slider-group">
+        <input type="number" id="reorderVal" min="1" max="52" step="1" value="1" style="width:60px;">
+        <select id="reorderUnit" style="width:auto;">
+          <option value="7" selected>weeks</option>
+          <option value="30">months</option>
+          <option value="1">days</option>
+        </select>
+      </div>
     </div>
   </div>
 </div>
@@ -562,10 +519,12 @@ h1 {
       <thead>
         <tr>
           <th>Order Qty</th>
+          <th>Coverage<span class="info-tip" title="How many days of demand this order + stock covers within the reorder cycle. 'OK' means full coverage; 'X of Y days' means stockout risk.">?</span></th>
           <th>Avg Inventory</th>
           <th>Stock Turn</th>
           <th>GMROII</th>
           <th>Annual Margin</th>
+          <th>Days to Recover<span class="info-tip" title="How many days of sales revenue needed to pay off the order cost. Lower is better.">?</span></th>
         </tr>
       </thead>
       <tbody id="comparisonBody"></tbody>
@@ -622,7 +581,9 @@ h1 {
   const weeklySales   = $('weeklySales');
   const orderSlider   = $('orderSlider');
   const orderInput    = $('orderInput');
-  const reorderFreq   = $('reorderFreq');
+  const paymentDays   = $('paymentDays');
+  const reorderVal    = $('reorderVal');
+  const reorderUnit   = $('reorderUnit');
 
   // Advisor refs
   const advCurrDiscount = $('advCurrDiscount');
@@ -638,9 +599,9 @@ h1 {
 
   // --- Recalculate on any change ---
   const inputs = [retailPrice, discountSlider, discountInput, currentStock, weeklySales,
-                  orderSlider, orderInput, reorderFreq];
+                  orderSlider, orderInput, paymentDays, reorderVal, reorderUnit];
   inputs.forEach(el => el.addEventListener('input', recalc));
-  reorderFreq.addEventListener('change', recalc);
+  reorderUnit.addEventListener('change', recalc);
 
   const advisorInputs = [advCurrDiscount, advNextDiscount, advCurrQty, advNextQty];
   advisorInputs.forEach(el => el.addEventListener('input', recalcAdvisor));
@@ -653,7 +614,8 @@ h1 {
       stock: parseInt(currentStock.value) || 0,
       salesPerWeek: parseFloat(weeklySales.value) || 0,
       orderQty: parseInt(orderInput.value) || 0,
-      reorderDays: parseInt(reorderFreq.value) || 7
+      reorderDays: (parseInt(reorderVal.value) || 1) * (parseInt(reorderUnit.value) || 7),
+      paymentDays: parseInt(paymentDays.value) || 30
     };
   }
 
@@ -681,28 +643,32 @@ h1 {
     const avgUnits = inp.stock + qty / 2;
     const avgInvAtCost = avgUnits * costPerCopy;
 
-    const annualSalesUnits = inp.salesPerWeek * 52;
+    // Coverage ratio: cap annual sales by supply capacity per reorder cycle
+    const supplyPerCycle = inp.stock + qty;
+    const coverageRatio = demandPerCycle > 0 ? Math.min(1, supplyPerCycle / demandPerCycle) : 1;
+    const effectiveSalesPerWeek = inp.salesPerWeek * coverageRatio;
+
+    const annualSalesUnits = effectiveSalesPerWeek * 52;
     const stockTurn = avgInvAtCost > 0 ? (annualSalesUnits * costPerCopy) / avgInvAtCost : 0;
 
     const gmroii = marginPerDollar * stockTurn;
     const annualGrossMargin = avgInvAtCost > 0 ? gmroii * avgInvAtCost : 0;
 
-    // Cash flow: can sales pay invoices in 30/60 days?
-    // Revenue in 30 days = salesPerWeek * (30/7) * price
-    // Cost of order = qty * costPerCopy
-    const rev30 = inp.salesPerWeek * (30 / 7) * p;
-    const rev60 = inp.salesPerWeek * (60 / 7) * p;
+    // Cash flow: can sales pay the invoice within payment terms?
+    const payDays = inp.paymentDays;
+    const revInTerm = inp.salesPerWeek * (payDays / 7) * p;
+    const revDouble = inp.salesPerWeek * (payDays * 2 / 7) * p;
     const orderCost = qty * costPerCopy;
 
     let cashflow = 'ok';
-    let cashflowText = 'Sales cover invoice within 30 days';
+    let cashflowText = `Sales cover invoice within ${payDays} days`;
     if (orderCost > 0) {
-      if (rev30 >= orderCost) {
+      if (revInTerm >= orderCost) {
         cashflow = 'ok';
-        cashflowText = 'Sales cover invoice within 30 days';
-      } else if (rev60 >= orderCost) {
+        cashflowText = `Sales cover invoice within ${payDays} days`;
+      } else if (revDouble >= orderCost) {
         cashflow = 'warn';
-        cashflowText = 'Sales cover invoice in 30\u201360 days';
+        cashflowText = `Sales cover invoice in ${payDays}\u2013${payDays * 2} days`;
       } else {
         cashflow = 'bad';
         const daysToRecover = inp.salesPerWeek > 0 ? Math.ceil((orderCost / (inp.salesPerWeek * p)) * 7) : Infinity;
@@ -717,7 +683,8 @@ h1 {
     return {
       costPerCopy, marginPerCopy, marginPerDollar, gmros,
       avgUnits, avgInvAtCost, stockTurn, gmroii, annualGrossMargin,
-      cashflow, cashflowText, orderCost
+      cashflow, cashflowText, orderCost,
+      coverageRatio, demandPerCycle, effectiveSalesPerWeek
     };
   }
 
@@ -727,8 +694,11 @@ h1 {
     const gmroiiClass = m.gmroii >= 2 ? 'positive' : m.gmroii >= 1 ? '' : 'negative';
     const p = inp.price;
     const d = inp.discount;
-    const annualCOGS = (inp.salesPerWeek * 52 * m.costPerCopy);
-    const rev30 = inp.salesPerWeek * (30/7) * p;
+    const annualCOGS = (m.effectiveSalesPerWeek * 52 * m.costPerCopy);
+    const coverageNote = m.coverageRatio < 1
+      ? `<div class="metric-formula" style="background:var(--red-light); color:var(--red);">&#9888; Stock + order covers only ${Math.round(m.coverageRatio * inp.reorderDays)} of ${inp.reorderDays} days in the reorder cycle. Effective sales: ${m.effectiveSalesPerWeek.toFixed(2)}/wk (was ${inp.salesPerWeek}/wk)</div>`
+      : '';
+    const revInTerm = inp.salesPerWeek * (inp.paymentDays/7) * p;
     panel.innerHTML = `
       <div class="metric-card highlight">
         <div class="metric-label">GMROII</div>
@@ -746,7 +716,8 @@ h1 {
         <div class="metric-label">Stock Turn</div>
         <div class="metric-value">${m.stockTurn.toFixed(1)}</div>
         <div class="metric-sub">Annual inventory turns</div>
-        <div class="metric-formula">$${annualCOGS.toFixed(0)} / $${m.avgInvAtCost.toFixed(0)} = ${m.stockTurn.toFixed(1)}<br>annual COGS / avg inventory at cost</div>
+        <div class="metric-formula">${m.effectiveSalesPerWeek.toFixed(2)}&times;52&times;$${m.costPerCopy.toFixed(2)} / $${m.avgInvAtCost.toFixed(0)} = ${m.stockTurn.toFixed(1)}<br>annual COGS / avg inventory at cost</div>
+        ${coverageNote}
       </div>
       <div class="metric-card">
         <div class="metric-label">Cost / Copy</div>
@@ -770,13 +741,13 @@ h1 {
         <div class="metric-label">Annual Gross Margin</div>
         <div class="metric-value">$${m.annualGrossMargin.toFixed(0)}</div>
         <div class="metric-sub">GMROII &times; avg inv at cost</div>
-        <div class="metric-formula">${m.gmroii.toFixed(2)} &times; $${m.avgInvAtCost.toFixed(0)} = $${m.annualGrossMargin.toFixed(0)}<br>or: ${inp.salesPerWeek} &times; 52 &times; $${m.marginPerCopy.toFixed(2)} = $${m.annualGrossMargin.toFixed(0)}</div>
+        <div class="metric-formula">${m.gmroii.toFixed(2)} &times; $${m.avgInvAtCost.toFixed(0)} = $${m.annualGrossMargin.toFixed(0)}<br>or: ${m.effectiveSalesPerWeek.toFixed(2)} &times; 52 &times; $${m.marginPerCopy.toFixed(2)} = $${m.annualGrossMargin.toFixed(0)}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Cash Flow</div>
         <div class="metric-value cashflow-${m.cashflow}" style="font-size:1rem;">${m.cashflowText}</div>
         <div class="metric-sub">Order cost: $${m.orderCost.toFixed(0)}</div>
-        <div class="metric-formula">${inp.salesPerWeek} &times; ${(30/7).toFixed(1)}wk &times; $${p.toFixed(2)} = $${rev30.toFixed(0)} rev/30d<br>vs order: ${inp.orderQty} &times; $${m.costPerCopy.toFixed(2)} = $${m.orderCost.toFixed(0)}</div>
+        <div class="metric-formula">${inp.salesPerWeek} &times; ${(inp.paymentDays/7).toFixed(1)}wk &times; $${p.toFixed(2)} = $${revInTerm.toFixed(0)} rev/${inp.paymentDays}d<br>vs order: ${inp.orderQty} &times; $${m.costPerCopy.toFixed(2)} = $${m.orderCost.toFixed(0)}</div>
       </div>
     `;
   }
@@ -802,20 +773,45 @@ h1 {
     if (m0.gmroii > bestGmroii && inp.stock > 0) { bestGmroii = m0.gmroii; bestQty = 0; }
 
     const tbody = $('comparisonBody');
-    tbody.innerHTML = rows.map(({ q, m }) => {
+    // Find the peak GMROII index to flag rows past the peak as suboptimal
+    let peakIdx = rows.findIndex(r => r.q === bestQty);
+
+    tbody.innerHTML = rows.map(({ q, m }, idx) => {
       const isCurrent = q === inp.orderQty;
       const isOptimal = q === bestQty && q !== inp.orderQty;
-      const cls = isCurrent ? 'current' : isOptimal ? 'optimal' : '';
+      const isPastPeak = idx > peakIdx && q > bestQty && m.gmroii < bestGmroii;
+      let cls = isCurrent ? 'current' : isOptimal ? 'optimal' : '';
+      if (isPastPeak && !isCurrent) cls = 'suboptimal';
       const tags = (isCurrent ? '<span class="tag tag-current">current</span>' : '') +
                    (isOptimal ? '<span class="tag tag-optimal">best</span>' : '') +
-                   (q === bestQty && isCurrent ? '<span class="tag tag-optimal">best</span>' : '');
-      const annCOGS = inp.salesPerWeek * 52 * m.costPerCopy;
+                   (q === bestQty && isCurrent ? '<span class="tag tag-optimal">best</span>' : '') +
+                   (isPastPeak ? '<span class="tag tag-suboptimal">overstock</span>' : '');
+      const annCOGS = m.effectiveSalesPerWeek * 52 * m.costPerCopy;
+      const covDays = Math.round(m.coverageRatio * inp.reorderDays);
+      const covCell = m.coverageRatio >= 1
+        ? '<span class="coverage-full">OK</span>'
+        : `<span class="coverage-short">${covDays} of ${inp.reorderDays}d</span>`;
+
+      // Days to recover order cost
+      let recoverCell;
+      if (q === 0) {
+        recoverCell = '&mdash;';
+      } else if (inp.salesPerWeek <= 0) {
+        recoverCell = '<span class="coverage-short">&infin;</span>';
+      } else {
+        const daysToRecover = Math.ceil((m.orderCost / (inp.salesPerWeek * inp.price)) * 7);
+        const recoverClass = daysToRecover <= 30 ? 'coverage-full' : daysToRecover <= 60 ? '' : 'coverage-short';
+        recoverCell = `<span class="${recoverClass}">${daysToRecover}d</span>`;
+      }
+
       return `<tr class="${cls}">
         <td>${q}${tags}</td>
+        <td>${covCell}</td>
         <td>${m.avgUnits.toFixed(1)} units<span class="formula">${inp.stock}+${q}/2 = ${m.avgUnits.toFixed(1)}</span></td>
         <td>${m.stockTurn.toFixed(1)}<span class="formula">${annCOGS.toFixed(0)}/${m.avgInvAtCost.toFixed(0)}</span></td>
         <td>${m.gmroii.toFixed(2)}<span class="formula">${m.marginPerDollar.toFixed(3)}&times;${m.stockTurn.toFixed(1)}</span></td>
         <td>$${m.annualGrossMargin.toFixed(0)}<span class="formula">${m.gmroii.toFixed(2)}&times;${m.avgInvAtCost.toFixed(0)}</span></td>
+        <td>${recoverCell}</td>
       </tr>`;
     }).join('');
   }
@@ -824,43 +820,75 @@ h1 {
   function renderEarningChart(inp) {
     const container = $('earningChart');
     const d = inp.discount;
-    const costPerCopy = inp.price * (1 - d);
-    const marginPerCopy = inp.price * d;
     const marginPerDollar = d > 0 && d < 1 ? d / (1 - d) : 0;
 
-    // For a single copy sitting on the shelf for W weeks:
-    // If it sells at week W, annualized GMROII = (marginPerCopy / costPerCopy) * (52/W)
-    // = marginPerDollar * (52/W)
     const weeks = [1, 2, 3, 4, 6, 8, 10, 13, 16, 20, 26, 39, 52];
     const values = weeks.map(w => marginPerDollar * (52 / w));
     const maxVal = Math.max(...values, 1);
 
-    const chartAreaHeight = 170; // px for bars
+    // SVG dimensions
+    const W = 600, H = 240;
+    const pad = { top: 30, right: 20, bottom: 35, left: 50 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
 
-    // Build Y axis
+    const xScale = w => pad.left + ((w - 1) / 51) * plotW;
+    const yScale = v => pad.top + plotH - (v / maxVal) * plotH;
+
+    // Grid lines & Y labels
     const ySteps = 5;
-    let yAxisHtml = '';
-    for (let i = ySteps; i >= 0; i--) {
-      yAxisHtml += `<span>${((maxVal / ySteps) * i).toFixed(1)}</span>`;
+    let gridHtml = '';
+    for (let i = 0; i <= ySteps; i++) {
+      const val = (maxVal / ySteps) * i;
+      const y = yScale(val);
+      gridHtml += `<line x1="${pad.left}" y1="${y}" x2="${W - pad.right}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
+      gridHtml += `<text x="${pad.left - 6}" y="${y + 3}" text-anchor="end" fill="var(--muted)" font-size="10">${val.toFixed(1)}</text>`;
     }
 
-    // Build bars
-    let barsHtml = `<div class="chart-y-axis">${yAxisHtml}</div>`;
-    weeks.forEach((w, i) => {
-      const v = values[i];
-      const h = maxVal > 0 ? (v / maxVal) * chartAreaHeight : 0;
-      const hue = Math.max(0, 120 - (w / 52) * 120); // green to red
-      const color = `hsl(${hue}, 70%, 45%)`;
-      barsHtml += `
-        <div class="bar-wrapper">
-          <div class="bar" style="height:${h}px; background:${color};">
-            <div class="bar-value" style="color:${color};">${v.toFixed(1)}</div>
-          </div>
-          <div class="bar-label">Wk ${w}</div>
-        </div>`;
+    // X labels
+    const xLabels = [1, 4, 8, 13, 26, 39, 52];
+    let xLabelHtml = '';
+    xLabels.forEach(w => {
+      const x = xScale(w);
+      xLabelHtml += `<text x="${x}" y="${H - pad.bottom + 18}" text-anchor="middle" fill="var(--muted)" font-size="10">Wk ${w}</text>`;
     });
 
-    container.innerHTML = barsHtml;
+    // Gradient fill under line
+    let pathD = `M ${xScale(weeks[0])} ${yScale(values[0])}`;
+    weeks.forEach((w, i) => { if (i > 0) pathD += ` L ${xScale(w)} ${yScale(values[i])}`; });
+    const fillD = pathD + ` L ${xScale(weeks[weeks.length - 1])} ${yScale(0)} L ${xScale(weeks[0])} ${yScale(0)} Z`;
+
+    // Dots & value labels
+    let dotsHtml = '';
+    weeks.forEach((w, i) => {
+      const x = xScale(w);
+      const y = yScale(values[i]);
+      const hue = Math.max(0, 120 - (w / 52) * 120);
+      const color = `hsl(${hue}, 70%, 45%)`;
+      dotsHtml += `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+      const nudge = (w >= 2 && w <= 4) ? 12 : 0;
+      const anchor = (w >= 2 && w <= 4) ? 'start' : 'middle';
+      dotsHtml += `<text x="${x + nudge}" y="${y - 8}" text-anchor="${anchor}" fill="${color}" font-size="9" font-weight="600">${values[i].toFixed(1)}</text>`;
+    });
+
+    container.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="hsl(120,70%,45%)"/>
+            <stop offset="100%" stop-color="hsl(0,70%,45%)"/>
+          </linearGradient>
+          <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        ${gridHtml}
+        ${xLabelHtml}
+        <path d="${fillD}" fill="url(#fillGrad)"/>
+        <path d="${pathD}" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dotsHtml}
+      </svg>`;
   }
 
   // --- Discount Step Advisor ---
