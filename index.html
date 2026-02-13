@@ -132,7 +132,7 @@ h1 {
 .dashboard {
   display: grid;
   grid-template-columns: 280px 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   gap: 20px;
   margin-bottom: 24px;
 }
@@ -142,7 +142,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  grid-row: 1 / 3;
+  grid-row: 1 / 4;
 }
 
 .metric-card {
@@ -291,19 +291,19 @@ h1 {
 
 /* Discount Step Advisor */
 .advisor-section {
-  margin-bottom: 24px;
+  grid-column: 2;
 }
 
 .advisor-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 12px;
 }
 
 .advisor-inputs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .advisor-result {
@@ -331,15 +331,15 @@ h1 {
 }
 
 .advisor-verdict {
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .advisor-explanation {
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 /* Responsive - tablet */
@@ -353,7 +353,7 @@ h1 {
     flex-wrap: wrap;
   }
   .metric-card { flex: 1; min-width: 140px; }
-  .comparison-section, .chart-section { grid-column: 1; }
+  .comparison-section, .chart-section, .advisor-section { grid-column: 1; }
   .advisor-grid { grid-template-columns: 1fr; }
 }
 
@@ -450,6 +450,55 @@ h1 {
   margin-left: 4px;
   vertical-align: middle;
 }
+
+/* Lexicon */
+.lexicon-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.lexicon-toggle .toggle-arrow {
+  transition: transform 0.25s ease;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.lexicon-toggle .toggle-arrow.open {
+  transform: rotate(180deg);
+}
+
+.lexicon-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+
+.lexicon-panel.open {
+  max-height: 2000px;
+}
+
+.lexicon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.lexicon-term h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.lexicon-term p {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
 </style>
 </head>
 <body>
@@ -507,6 +556,50 @@ h1 {
   </div>
 </div>
 
+<!-- LEXICON -->
+<div class="card" style="margin-bottom: 24px;">
+  <div class="lexicon-toggle" id="lexiconToggle">
+    <h2 style="margin-bottom: 0;">Lexicon</h2>
+    <span class="toggle-arrow" id="toggleArrow">&#9660;</span>
+  </div>
+  <div class="lexicon-panel" id="lexiconPanel">
+    <div class="lexicon-grid">
+      <div class="lexicon-term">
+        <h3>GMROII</h3>
+        <p>Gross Margin Return on Inventory Investment. Measures how many dollars of gross margin you earn annually for each dollar tied up in inventory. GMROII = Markup &times; Stock Turn. A value above 2.0 is generally healthy; below 1.0 means your inventory costs more to carry than it earns.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>GMROS (Discount)</h3>
+        <p>Gross Margin Return on Sales &mdash; the vendor discount expressed as a margin on sales. If a vendor gives you 40% off retail, your margin on each sale is 40%. This is the &ldquo;profitability per sale&rdquo; half of GMROII; the other half is how fast you sell.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>Stock Turn</h3>
+        <p>How many times per year your average inventory sells through, measured at cost. Stock Turn = Annual COGS &divide; Avg Inventory at Cost. Higher turns mean your capital recycles faster, boosting GMROII even at lower margins.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>Cost / Copy</h3>
+        <p>Your net cost per copy (retail price minus discount) and the margin per copy. For a $20 book at 40% discount: cost = $12.00, margin = $8.00. This is the building block for all other calculations.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>Markup</h3>
+        <p>Margin per dollar invested in inventory: Discount / (1 &minus; Discount). At 40% discount, markup = 0.667, meaning you earn $0.667 for every $1.00 in cost. This is the &ldquo;profitability per dollar&rdquo; component of GMROII.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>Avg Inventory</h3>
+        <p>The average inventory at cost using a sawtooth model: (Stock on Hand + Order Qty / 2) &times; Cost per Copy. Represents the typical capital you have tied up in this title between reorders.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>Annual Gross Margin</h3>
+        <p>The estimated gross margin generated over a full year: GMROII &times; Avg Inventory at Cost. Equivalently: weekly sales &times; 52 &times; margin per copy. Shows the absolute dollar return, not just the rate of return.</p>
+      </div>
+      <div class="lexicon-term">
+        <h3>Cash Flow</h3>
+        <p>Compares expected sales revenue within your payment terms against the order cost. &ldquo;OK&rdquo; means sales cover the invoice on time. &ldquo;Warn&rdquo; means you need up to 2&times; payment terms. &ldquo;Bad&rdquo; means recovery takes even longer &mdash; you may need to fund the order from other cash flow.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DASHBOARD -->
 <div class="dashboard">
   <!-- LEFT: Key Metrics -->
@@ -531,42 +624,40 @@ h1 {
     </table>
   </div>
 
-  <!-- CENTER-BOTTOM: Earning Power Chart -->
+  <!-- DISCOUNT STEP ADVISOR -->
+  <div class="card advisor-section">
+    <h2>Discount Step Advisor <span class="info-tip" title="Should you order more copies to reach the next discount tier? Uses the exact GMROII break-even formula based on your actual margin.">?</span></h2>
+    <div class="advisor-grid">
+      <div class="advisor-inputs">
+        <div class="field">
+          <label for="advCurrDiscount">Discount at Planned Qty (%)</label>
+          <input type="number" id="advCurrDiscount" value="41" min="0" max="70" step="0.5">
+        </div>
+        <div class="field">
+          <label for="advNextDiscount">Discount at Higher Tier (%)</label>
+          <input type="number" id="advNextDiscount" value="42" min="0" max="70" step="0.5">
+        </div>
+        <div class="field">
+          <label for="advCurrQty">Planned Order (copies)</label>
+          <input type="number" id="advCurrQty" value="100" min="1" step="1">
+        </div>
+        <div class="field">
+          <label for="advNextQty">Min. Copies for Higher Tier</label>
+          <input type="number" id="advNextQty" value="104" min="1" step="1">
+        </div>
+      </div>
+      <div class="advisor-result neutral" id="advisorResult">
+        <div class="advisor-verdict" id="advisorVerdict">Enter values</div>
+        <div class="advisor-explanation" id="advisorExplanation">Adjust the inputs to see whether stepping up to the next discount tier is worthwhile.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Earning Power Chart -->
   <div class="card chart-section">
     <h2>Earning Power Decline <span class="info-tip" title="Shows how a copy's annualized earning power drops the longer it sits on the shelf">?</span></h2>
-    <p style="font-size:0.82rem; color:var(--muted); margin-bottom:12px;">Annualized GMROII asks: <em>if a single copy sits on the shelf for W weeks and then sells, what would its return on investment be projected over a full year?</em> A copy sold in week 1 earns its margin 52 times over (annualized); a copy that takes 26 weeks to sell only earns it twice. The faster a copy sells, the harder your invested dollar works.</p>
     <div class="chart-container" id="earningChart"></div>
     <p class="chart-title">Weeks in Store &rarr; Annualized GMROII per Copy</p>
-  </div>
-</div>
-
-<!-- DISCOUNT STEP ADVISOR -->
-<div class="card advisor-section">
-  <h2>Discount Step Advisor <span class="info-tip" title="Should you order more copies to reach the next discount tier? Uses the exact GMROII break-even formula based on your actual margin.">?</span></h2>
-  <p style="font-size:0.82rem; color:var(--muted); margin-bottom:16px;">You planned to order a certain number of copies at your current discount. The vendor offers a higher discount if you order more. Is the extra discount worth the extra copies? Calculated using the exact markup ratio, not Shatzkin's fixed 4% approximation.</p>
-  <div class="advisor-grid">
-    <div class="advisor-inputs">
-      <div class="field">
-        <label for="advCurrDiscount">Discount at Planned Qty (%)</label>
-        <input type="number" id="advCurrDiscount" value="41" min="0" max="70" step="0.5">
-      </div>
-      <div class="field">
-        <label for="advNextDiscount">Discount at Higher Tier (%)</label>
-        <input type="number" id="advNextDiscount" value="42" min="0" max="70" step="0.5">
-      </div>
-      <div class="field">
-        <label for="advCurrQty">Planned Order (copies)</label>
-        <input type="number" id="advCurrQty" value="100" min="1" step="1">
-      </div>
-      <div class="field">
-        <label for="advNextQty">Min. Copies for Higher Tier</label>
-        <input type="number" id="advNextQty" value="104" min="1" step="1">
-      </div>
-    </div>
-    <div class="advisor-result neutral" id="advisorResult">
-      <div class="advisor-verdict" id="advisorVerdict">Enter values</div>
-      <div class="advisor-explanation" id="advisorExplanation">Adjust the inputs to see whether stepping up to the next discount tier is worthwhile.</div>
-    </div>
   </div>
 </div>
 
@@ -827,8 +918,8 @@ h1 {
     const maxVal = Math.max(...values, 1);
 
     // SVG dimensions
-    const W = 600, H = 240;
-    const pad = { top: 30, right: 20, bottom: 35, left: 50 };
+    const W = 500, H = 180;
+    const pad = { top: 24, right: 16, bottom: 30, left: 42 };
     const plotW = W - pad.left - pad.right;
     const plotH = H - pad.top - pad.bottom;
 
@@ -958,6 +1049,15 @@ h1 {
     renderComparison(inp);
     renderEarningChart(inp);
   }
+
+  // --- Lexicon toggle ---
+  const lexiconToggle = $('lexiconToggle');
+  const lexiconPanel = $('lexiconPanel');
+  const toggleArrow = $('toggleArrow');
+  lexiconToggle.addEventListener('click', () => {
+    lexiconPanel.classList.toggle('open');
+    toggleArrow.classList.toggle('open');
+  });
 
   // --- Init ---
   recalc();
