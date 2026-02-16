@@ -878,23 +878,16 @@ h1 {
     }
     qtys.sort((a, b) => a - b);
 
-    let bestGmroii = -Infinity;
-    let bestQty = 0;
+    // Best = minCoverageQty: the exact quantity that provides full stock coverage
+    // (reorder cycle + lead time) while maximizing GMROII.
+    // Any less = stockout risk, any more = lower GMROII from excess inventory.
+    const bestQty = Math.max(1, minCoverageQty);
     const rows = qtys.map(q => {
       const m = calcMetrics(inp, q);
-      // Best = highest GMROII among quantities that meet minimum coverage requirement
-      // Order must cover demand during reorder cycle + lead time (minus existing stock)
-      const meetsMinCoverage = q >= minCoverageQty;
-      if (m.gmroii > bestGmroii && q > 0 && meetsMinCoverage) { bestGmroii = m.gmroii; bestQty = q; }
       return { q, m };
     });
-
-    // If no qty meets minimum coverage, pick the largest available (closest to coverage)
-    if (bestGmroii === -Infinity) {
-      rows.forEach(({ q, m }) => {
-        if (q > bestQty) { bestGmroii = m.gmroii; bestQty = q; }
-      });
-    }
+    const bestRow = rows.find(r => r.q === bestQty);
+    const bestGmroii = bestRow ? bestRow.m.gmroii : 0;
 
     const tbody = $('comparisonBody');
     // Find the peak GMROII index to flag rows past the peak as suboptimal
