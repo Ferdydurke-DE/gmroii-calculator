@@ -550,6 +550,10 @@ h1 {
       </div>
     </div>
     <div class="field">
+      <label for="leadTimeDays">Lead Time (days)<span class="info-tip" title="Number of days between placing an order and receiving the goods. Order quantity should cover demand during Reorder Cycle + Lead Time to avoid stockouts.">?</span></label>
+      <input type="number" id="leadTimeDays" value="7" min="0" max="90" step="1">
+    </div>
+    <div class="field">
       <label for="paymentDays">Payment Terms<span class="info-tip" title="Number of days to pay the vendor invoice. Cash flow check compares sales revenue within this window vs order cost.">?</span></label>
       <input type="number" id="paymentDays" value="30" min="1" max="365" step="1">
     </div>
@@ -604,6 +608,10 @@ h1 {
         <p>The estimated gross margin generated over a full year: GMROII &times; Avg Inventory at Cost. Equivalently: weekly sales &times; 52 &times; margin per copy. Shows the absolute dollar return, not just the rate of return.</p>
       </div>
       <div class="lexicon-term">
+        <h3>Lead Time</h3>
+        <p>The number of days between placing an order and receiving the goods. The order quantity must cover demand during both the reorder cycle and the lead time to prevent stockouts. Coverage = Reorder Cycle + Lead Time. A longer lead time requires a larger order or more safety stock.</p>
+      </div>
+      <div class="lexicon-term">
         <h3>Cash Flow</h3>
         <p>Compares expected sales revenue within your payment terms against the order cost. &ldquo;OK&rdquo; means sales cover the invoice on time. &ldquo;Warn&rdquo; means you need up to 2&times; payment terms. &ldquo;Bad&rdquo; means recovery takes even longer &mdash; you may need to fund the order from other cash flow.</p>
       </div>
@@ -623,7 +631,7 @@ h1 {
       <thead>
         <tr>
           <th>Order Qty</th>
-          <th>Coverage<span class="info-tip" title="How many days of demand this order + stock covers within the reorder cycle. 'OK' means full coverage; 'X of Y days' means stockout risk.">?</span></th>
+          <th>Coverage<span class="info-tip" title="How many days of demand this order + stock covers within the reorder cycle + lead time. 'OK' means full coverage; 'X of Y days' means stockout risk.">?</span></th>
           <th>Avg Inventory</th>
           <th>Stock Turn</th>
           <th>GMROII</th>
@@ -683,6 +691,7 @@ h1 {
   const weeklySales   = $('weeklySales');
   const orderSlider   = $('orderSlider');
   const orderInput    = $('orderInput');
+  const leadTimeDays  = $('leadTimeDays');
   const paymentDays   = $('paymentDays');
   const reorderVal    = $('reorderVal');
   const reorderUnit   = $('reorderUnit');
@@ -701,7 +710,7 @@ h1 {
 
   // --- Recalculate on any change ---
   const inputs = [retailPrice, discountSlider, discountInput, currentStock, weeklySales,
-                  orderSlider, orderInput, paymentDays, reorderVal, reorderUnit];
+                  orderSlider, orderInput, leadTimeDays, paymentDays, reorderVal, reorderUnit];
   inputs.forEach(el => el.addEventListener('input', recalc));
   reorderUnit.addEventListener('change', recalc);
 
@@ -717,6 +726,7 @@ h1 {
       salesPerWeek: parseFloat(weeklySales.value) || 0,
       orderQty: parseInt(orderInput.value) || 0,
       reorderDays: (parseInt(reorderVal.value) || 1) * (parseInt(reorderUnit.value) || 7),
+      leadTimeDays: parseInt(leadTimeDays.value) || 0,
       paymentDays: parseInt(paymentDays.value) || 30
     };
   }
@@ -730,24 +740,21 @@ h1 {
     const marginPerDollar = d > 0 && d < 1 ? d / (1 - d) : 0;
     const gmros = d; // margin on sales is the discount percentage
 
-    // Average inventory calculation using reorder cycle
-    // During a cycle of `reorderDays` days, stock depletes from (stock + qty) to stock.
-    // Average units on shelf = stock + qty/2 (sawtooth pattern)
+    // Coverage must span reorder cycle + lead time
+    // During lead time, no new stock arrives, so we need enough to cover both periods
+    const leadTimeDays = inp.leadTimeDays || 0;
+    const coverageDays = inp.reorderDays + leadTimeDays;
+    const coverageWeeks = coverageDays / 7;
     const reorderWeeks = inp.reorderDays / 7;
+    const demandPerCoverage = inp.salesPerWeek * coverageWeeks;
     const demandPerCycle = inp.salesPerWeek * reorderWeeks;
 
-    // More realistic: if we order `qty` every cycle, average inventory in units
-    // is the mean of start-of-cycle and end-of-cycle stock.
-    // Start = current_stock + qty (just received), End = current_stock + qty - demandPerCycle
-    // But simplified: avg_units = qty / 2 + max(stock - demandPerCycle/2, 0)
-    // We use a practical model: avg_units = stock + qty / 2
-    // This assumes stock on hand is the baseline and orders replenish on top.
     const avgUnits = inp.stock + qty / 2;
     const avgInvAtCost = avgUnits * costPerCopy;
 
-    // Coverage ratio: cap annual sales by supply capacity per reorder cycle
+    // Coverage ratio: supply must cover demand during reorder cycle + lead time
     const supplyPerCycle = inp.stock + qty;
-    const coverageRatio = demandPerCycle > 0 ? Math.min(1, supplyPerCycle / demandPerCycle) : 1;
+    const coverageRatio = demandPerCoverage > 0 ? Math.min(1, supplyPerCycle / demandPerCoverage) : 1;
     const effectiveSalesPerWeek = inp.salesPerWeek * coverageRatio;
 
     const annualSalesUnits = effectiveSalesPerWeek * 52;
@@ -786,7 +793,7 @@ h1 {
       costPerCopy, marginPerCopy, marginPerDollar, gmros,
       avgUnits, avgInvAtCost, stockTurn, gmroii, annualGrossMargin,
       cashflow, cashflowText, orderCost,
-      coverageRatio, demandPerCycle, effectiveSalesPerWeek
+      coverageRatio, demandPerCoverage, coverageDays, effectiveSalesPerWeek
     };
   }
 
@@ -798,7 +805,7 @@ h1 {
     const d = inp.discount;
     const annualCOGS = (m.effectiveSalesPerWeek * 52 * m.costPerCopy);
     const coverageNote = m.coverageRatio < 1
-      ? `<div class="metric-formula" style="background:var(--red-light); color:var(--red);">&#9888; Stock + order covers only ${Math.round(m.coverageRatio * inp.reorderDays)} of ${inp.reorderDays} days in the reorder cycle. Effective sales: ${m.effectiveSalesPerWeek.toFixed(2)}/wk (was ${inp.salesPerWeek}/wk)</div>`
+      ? `<div class="metric-formula" style="background:var(--red-light); color:var(--red);">&#9888; Stock + order covers only ${Math.round(m.coverageRatio * m.coverageDays)} of ${m.coverageDays} days (reorder ${inp.reorderDays}d + lead time ${inp.leadTimeDays}d). Effective sales: ${m.effectiveSalesPerWeek.toFixed(2)}/wk (was ${inp.salesPerWeek}/wk)</div>`
       : '';
     const revInTerm = inp.salesPerWeek * (inp.paymentDays/7) * p;
     panel.innerHTML = `
@@ -856,23 +863,41 @@ h1 {
 
   // --- Comparison table ---
   function renderComparison(inp) {
+    // Minimum coverage qty: must cover reorder cycle + lead time
+    const coverageDays = inp.reorderDays + (inp.leadTimeDays || 0);
+    const coverageWeeks = coverageDays / 7;
+    const minCoverageQty = Math.max(0, Math.ceil(inp.salesPerWeek * coverageWeeks) - inp.stock);
+
     const qtys = [0, 1, 3, 5, 10, 25, 50, 100];
+    // Add the minimum coverage qty as a suggested option
+    if (minCoverageQty > 0 && !qtys.includes(minCoverageQty)) {
+      qtys.push(minCoverageQty);
+    }
     if (!qtys.includes(inp.orderQty)) {
       qtys.push(inp.orderQty);
-      qtys.sort((a, b) => a - b);
     }
+    qtys.sort((a, b) => a - b);
 
     let bestGmroii = -Infinity;
     let bestQty = 0;
     const rows = qtys.map(q => {
       const m = calcMetrics(inp, q);
-      if (m.gmroii > bestGmroii && q > 0) { bestGmroii = m.gmroii; bestQty = q; }
+      // Best = highest GMROII among quantities that provide full coverage
+      const coversNeeds = m.coverageRatio >= 1;
+      if (m.gmroii > bestGmroii && q > 0 && coversNeeds) { bestGmroii = m.gmroii; bestQty = q; }
       return { q, m };
     });
 
+    // If no qty with full coverage found, fall back to best GMROII overall
+    if (bestGmroii === -Infinity) {
+      rows.forEach(({ q, m }) => {
+        if (m.gmroii > bestGmroii && q > 0) { bestGmroii = m.gmroii; bestQty = q; }
+      });
+    }
+
     // If stock > 0 and orderQty = 0, that row may have the best GMROII
     const m0 = calcMetrics(inp, 0);
-    if (m0.gmroii > bestGmroii && inp.stock > 0) { bestGmroii = m0.gmroii; bestQty = 0; }
+    if (m0.gmroii > bestGmroii && inp.stock > 0 && m0.coverageRatio >= 1) { bestGmroii = m0.gmroii; bestQty = 0; }
 
     const tbody = $('comparisonBody');
     // Find the peak GMROII index to flag rows past the peak as suboptimal
@@ -889,10 +914,10 @@ h1 {
                    (q === bestQty && isCurrent ? '<span class="tag tag-optimal">best</span>' : '') +
                    (isPastPeak ? '<span class="tag tag-suboptimal">overstock</span>' : '');
       const annCOGS = m.effectiveSalesPerWeek * 52 * m.costPerCopy;
-      const covDays = Math.round(m.coverageRatio * inp.reorderDays);
+      const covDays = Math.round(m.coverageRatio * coverageDays);
       const covCell = m.coverageRatio >= 1
         ? '<span class="coverage-full">OK</span>'
-        : `<span class="coverage-short">${covDays} of ${inp.reorderDays}d</span>`;
+        : `<span class="coverage-short">${covDays} of ${coverageDays}d</span>`;
 
       // Days to recover order cost
       let recoverCell;
