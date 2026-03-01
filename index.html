@@ -886,7 +886,7 @@ h1 {
     // Best = minCoverageQty: the exact quantity that provides full stock coverage
     // (reorder cycle + lead time) while maximizing GMROII.
     // Any less = stockout risk, any more = lower GMROII from excess inventory.
-    const bestQty = Math.max(1, minCoverageQty);
+    const bestQty = minCoverageQty;
     const rows = qtys.map(q => {
       const m = calcMetrics(inp, q);
       return { q, m };
